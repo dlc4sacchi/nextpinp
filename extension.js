@@ -1,6 +1,8 @@
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import { Workspace } from 'resource:///org/gnome/shell/ui/workspace.js';
+import { WorkspaceThumbnail } from 'resource:///org/gnome/shell/ui/workspaceThumbnail.js';
 
 const PIP_TITLES = [
     'picture-in-picture',
@@ -106,6 +108,42 @@ export default class AutoPiPManager extends Extension {
     enable() {
         this._settings = this.getSettings();
         this._pendingIdles = new Set();
+        this._focusRestoreId = 0;
+        this._draggingPiP = false;
+
+        // Overview uses separate filters for workspace previews and thumbnails.
+        this._overviewFilter = Workspace.prototype._isOverviewWindow;
+        this._thumbnailFilter = WorkspaceThumbnail.prototype._isOverviewWindow;
+        const settings = this._settings;
+        const overviewFilter = this._overviewFilter;
+        const thumbnailFilter = this._thumbnailFilter;
+        Workspace.prototype._isOverviewWindow = function (window) {
+            return overviewFilter.call(this, window) &&
+                !(settings.get_boolean('do-not-show-on-overview') && isPiP(window));
+        };
+        WorkspaceThumbnail.prototype._isOverviewWindow = function (actor) {
+            return thumbnailFilter.call(this, actor) &&
+                !(settings.get_boolean('do-not-show-on-overview') && isPiP(actor.get_meta_window()));
+        };
+
+        this._overviewSettingId = settings.connect('changed::do-not-show-on-overview', () => {
+            this._refreshOverviewWindows();
+        });
+
+        this._focusWindowId = global.display.connect('notify::focus-window', () => {
+            if (isPiP(global.display.focus_window))
+                this._queueFocusRestore();
+        });
+        this._workspaceSwitchedId = global.workspace_manager.connect('workspace-switched', () => {
+            this._queueFocusRestore();
+        });
+        this._settingChangedId = this._settings.connect('changed::never-in-focus', () => {
+            this._queueFocusRestore();
+        });
+        this._grabOpBeginId = global.display.connect('grab-op-begin', (_display, window, op) => {
+            if (isPiP(window) && (op === Meta.GrabOp.MOVING || op === Meta.GrabOp.KEYBOARD_MOVING))
+                this._draggingPiP = true;
+        });
 
         this._windowCreatedId = global.display.connect('window-created', (_display, window) => {
             const id = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
@@ -115,6 +153,8 @@ export default class AutoPiPManager extends Extension {
                     return GLib.SOURCE_REMOVE;
 
                 applyPiPAttributes(window, this._settings);
+                this._queueFocusRestore();
+                this._refreshOverviewWindows();
 
                 if (!moveToPiPCorner(window, this._settings)) {
                     const actor = window.get_compositor_private();
@@ -140,10 +180,73 @@ export default class AutoPiPManager extends Extension {
             if (!isPiP(window))
                 return;
             snapToNearestCorner(window, this._settings);
+            this._draggingPiP = false;
+            this._queueFocusRestore();
+        });
+
+        this._queueFocusRestore();
+    }
+
+    _queueFocusRestore() {
+        if (!this._settings.get_boolean('never-in-focus'))
+            return;
+        if (this._focusRestoreId)
+            GLib.source_remove(this._focusRestoreId);
+
+        // Let Mutter finish focus changes before choosing another window.
+        this._focusRestoreId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+            this._focusRestoreId = 0;
+            this._restoreFocus();
+            return GLib.SOURCE_REMOVE;
         });
     }
 
+    _restoreFocus() {
+        // Keep PiP focused until the user finishes moving it.
+        if (!this._settings.get_boolean('never-in-focus') || this._draggingPiP)
+            return;
+
+        const pip = global.display.focus_window;
+        if (!isPiP(pip))
+            return;
+
+        const workspace = global.workspace_manager.get_active_workspace();
+        const nextWindow = global.display.get_tab_list(Meta.TabList.NORMAL_ALL, workspace)
+            .find(window => window !== pip && !window.minimized &&
+                window.located_on_workspace(workspace));
+        const timestamp = global.display.get_current_time();
+
+        if (nextWindow)
+            nextWindow.focus(timestamp);
+        else
+            global.display.unset_input_focus(timestamp);
+    }
+
+    _refreshOverviewWindows() {
+        // Refresh any Overview that is already open when the setting changes.
+        for (let i = 0; i < global.workspace_manager.get_n_workspaces(); i++) {
+            const workspace = global.workspace_manager.get_workspace_by_index(i);
+            for (const window of workspace.list_windows()) {
+                if (isPiP(window)) {
+                    workspace.emit('window-removed', window);
+                    workspace.emit('window-added', window);
+                }
+            }
+        }
+    }
+
     disable() {
+        if (this._focusRestoreId)
+            GLib.source_remove(this._focusRestoreId);
+        global.display.disconnect(this._focusWindowId);
+        global.workspace_manager.disconnect(this._workspaceSwitchedId);
+        this._settings.disconnect(this._settingChangedId);
+        global.display.disconnect(this._grabOpBeginId);
+        this._settings.disconnect(this._overviewSettingId);
+        Workspace.prototype._isOverviewWindow = this._overviewFilter;
+        WorkspaceThumbnail.prototype._isOverviewWindow = this._thumbnailFilter;
+        this._refreshOverviewWindows();
+
         if (this._windowCreatedId) {
             global.display.disconnect(this._windowCreatedId);
             this._windowCreatedId = null;

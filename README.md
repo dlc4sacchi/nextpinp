@@ -12,7 +12,9 @@
 - Automatically makes PiP windows visible **on every workspace**
 - Moves PiP windows to a **chosen corner** of the screen on appearance
 - Snaps PiP windows to a nearest screen corner after a moving.
-- No Top Bar icon, no background processes beyond a single window-creation listener
+- Optionally returns keyboard focus to another window after PiP takes it
+- Optionally keeps PiP out of Overview workspace previews and thumbnails
+- No Top Bar icon or separate background process
 
 ## Requirements
 
@@ -42,6 +44,8 @@ gnome-extensions prefs nextpinp@leonid.nasedkin
 |---------|-------------|---------|
 | Corner | Screen corner where PiP windows are placed | Bottom Right |
 | Offset | Distance from the corner edge in pixels (0–50) | 20 |
+| Never in Focus | Return focus to another window after PiP takes it; allow focus while moving PiP | Off |
+| Do Not Show on Overview | Hide PiP from workspace previews and thumbnails | Off |
 
 Available corners: Top Left, Top Right, Bottom Right, Bottom Left.
 

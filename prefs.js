@@ -35,6 +35,26 @@ export default class AutoPiPPreferences extends ExtensionPreferences {
         });
         behaviourGroup.add(alwaysOnAllWorkspacesRow);
 
+        const neverInFocusRow = new Adw.SwitchRow({
+            title: _('Never in Focus'),
+            subtitle: _('Return keyboard focus to another window after PiP takes it'),
+            active: settings.get_boolean('never-in-focus'),
+        });
+        neverInFocusRow.connect('notify::active', () => {
+            settings.set_boolean('never-in-focus', neverInFocusRow.active);
+        });
+        behaviourGroup.add(neverInFocusRow);
+
+        const overviewRow = new Adw.SwitchRow({
+            title: _('Do Not Show on Overview'),
+            subtitle: _('Keep PiP out of workspace previews and thumbnails'),
+            active: settings.get_boolean('do-not-show-on-overview'),
+        });
+        overviewRow.connect('notify::active', () => {
+            settings.set_boolean('do-not-show-on-overview', overviewRow.active);
+        });
+        behaviourGroup.add(overviewRow);
+
         // — Window Position group —
         const positionGroup = new Adw.PreferencesGroup({ title: _('Window Position') });
         page.add(positionGroup);

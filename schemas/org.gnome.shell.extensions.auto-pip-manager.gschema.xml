@@ -2,6 +2,16 @@
 <schemalist>
   <schema id="org.gnome.shell.extensions.auto-pip-manager"
           path="/org/gnome/shell/extensions/auto-pip-manager/">
+    <key name="never-in-focus" type="b">
+      <default>false</default>
+      <summary>Never in focus</summary>
+      <description>Return keyboard focus to another window when PiP takes it.</description>
+    </key>
+    <key name="do-not-show-on-overview" type="b">
+      <default>false</default>
+      <summary>Do not show on Overview</summary>
+      <description>Keep PiP windows out of workspace previews and thumbnails.</description>
+    </key>
     <key name="corner" type="s">
       <default>'bottom-right'</default>
       <summary>Corner position</summary>
