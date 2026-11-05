@@ -18,7 +18,7 @@
 
 ## Requirements
 
-- GNOME Shell 45 or later
+- GNOME Shell 49–51
 
 ## Installation
 

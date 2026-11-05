@@ -2,7 +2,7 @@
   "name": "Auto PiP Manager",
   "description": "Snaps PiP windows to a nearest corner. Automatically sets picture-in-picture windows to always-on-top and visible on all workspaces.",
   "uuid": "nextpinp@leonid.nasedkin",
-  "shell-version": ["49", "50"],
+  "shell-version": ["49", "50", "51"],
   "version": 7,
   "settings-schema": "org.gnome.shell.extensions.auto-pip-manager",
   "url": "https://github.com/EvilX/nextpinp"
